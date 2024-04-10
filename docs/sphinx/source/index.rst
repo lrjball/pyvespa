@@ -5,7 +5,12 @@
 
 
 .. image:: https://vespa.ai/assets/vespa-ai-logo-rock.svg
+    :class: only-light
+    :width: 600px
 
+.. image:: https://vespa.ai/assets/vespa-ai-logo-heather.svg
+    :class: only-dark
+    :width: 600px
 
 Vespa python API
 ================
