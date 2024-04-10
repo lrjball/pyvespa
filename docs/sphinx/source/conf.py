@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.abspath("../../.."))
 # -- Project information -----------------------------------------------------
 
 project = "pyvespa"
-copyright = "Copyright Vespa.ai. Licensed under Apache License 2.0"
+copyright = "Vespa.ai. Licensed under Apache License 2.0"
 author = "Vespa team"
 
 
@@ -28,7 +28,7 @@ author = "Vespa team"
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = ["sphinx.ext.autodoc", "nbsphinx", "sphinx_rtd_theme"]
+extensions = ["sphinx.ext.autodoc", "nbsphinx", "sphinx_favicon"]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
@@ -45,22 +45,40 @@ master_doc = "index"
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = "sphinx_rtd_theme"
-
+html_theme = "sphinx_book_theme"
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ["_static"]
 
-html_sidebars = {
-    "**": [
-        "about.html",
-        "navigation.html",
-        "relations.html",  # needs 'show_related': True theme option to display
-        "searchbox.html",
-        "donate.html",
-    ]
+# html_sidebars = {
+#     "**": [
+#         "about.html",
+#         "navigation.html",
+#         "relations.html",  # needs 'show_related': True theme option to display
+#         "searchbox.html",
+#         "donate.html",
+#     ]
+# }
+
+html_theme_options = {
+    "repository_url": "https://github.com/vespa-engine/pyvespa",
+    "use_repository_button": True,
+    "use_issues_button": True,
+    "use_edit_page_button": True,
 }
 
+html_title = "pyvespa"
+
+html_logo = "https://docs.vespa.ai/icons/favicon-32x32.png"
+
+favicons = [
+    {"href": "https://docs.vespa.ai/icons/favicon-32x32.png", "rel": "icon"},
+    {
+        "href": "https://docs.vespa.ai/icons/favicon-32x32.png",
+        "rel": "apple-touch-icon",
+    },
+]
+
 # anchoring with github sites will always fail
-linkcheck_ignore = [r'https://github.com/.*#.*', r'http://localhost:\d+/']
+linkcheck_ignore = [r"https://github.com/.*#.*", r"http://localhost:\d+/"]
