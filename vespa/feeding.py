@@ -6,7 +6,7 @@ import logging
 import multiprocessing
 import sys
 import time
-from typing import List
+from typing import Any, Dict, Generator, List
 
 # Configure logging
 logging.basicConfig(
@@ -30,11 +30,11 @@ class DataPoster(multiprocessing.Process):
 
     def __init__(
         self,
-        task_queue,
-        result_queue,
-        base_url,
-        output_dir,
-        concurrency,
+        task_queue: multiprocessing.JoinableQueue,
+        result_queue: multiprocessing.Queue,
+        base_url: str,
+        output_dir: str,
+        concurrency: int,
         worker_id: int,
     ):
         super().__init__()
@@ -46,7 +46,10 @@ class DataPoster(multiprocessing.Process):
         self.name = f"DataPoster-{worker_id}"
 
     async def post_data(
-        self, data: dict, session: httpx.AsyncClient, semaphore: asyncio.Semaphore
+        self,
+        data: Dict[str, Any],
+        session: httpx.AsyncClient,
+        semaphore: asyncio.Semaphore,
     ) -> RequestStatus:
         """Make an HTTP POST request to send data."""
         async with semaphore:  # Semaphore limits the number of concurrent posts
@@ -59,8 +62,11 @@ class DataPoster(multiprocessing.Process):
             return RequestStatus(time_spent, bytes_transferred, resp.status_code)
 
     async def process_data(
-        self, data: dict, session: httpx.AsyncClient, semaphore: asyncio.Semaphore
-    ) -> str:
+        self,
+        data: Dict[str, Any],
+        session: httpx.AsyncClient,
+        semaphore: asyncio.Semaphore,
+    ) -> RequestStatus:
         """Handle the posting of data."""
         logger.debug(f"{self.name} processing data")
         request_status = await self.post_data(
@@ -70,7 +76,6 @@ class DataPoster(multiprocessing.Process):
             logger.error(
                 f"{self.name}: POST failed, status={request_status.response_code}"
             )
-            return request_status
         return request_status
 
     async def asyncio_sessions(self) -> None:
@@ -96,17 +101,17 @@ class DataPoster(multiprocessing.Process):
             else:
                 self.result_queue.put(result)
 
-    def run(self):
+    def run(self) -> None:
         asyncio.run(self.asyncio_sessions())
 
 
-def generate_data(count: int):
+def generate_data(count: int) -> Generator[Dict[str, float], None, None]:
     """Generate dummy data items."""
     for i in range(count):
         yield {"id": i, "price": i * 10.5}
 
 
-def main():
+def main() -> None:
     args = parse_clargs()
 
     # Create queues for tasks and results
@@ -156,7 +161,7 @@ def main():
     )
 
 
-def parse_clargs():
+def parse_clargs() -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
         description="Asynchronous Data Posting using Multiprocessing and HTTP2"
