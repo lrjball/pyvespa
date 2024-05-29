@@ -56,8 +56,25 @@ jobs:
           Run integration tests
         run: |
           pytest tests/integration/test_integration_docker.py -s -v
+  get-notebooks:
+    runs-on: ubuntu-latest
+    outputs:
+      notebooks: ${{ steps.set_output.outputs.notebooks }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set output variable (Make sure it is this quote format - '["path/to/notebook1.ipynb", "path/to/notebook2.ipynb"]')
+        id: set_output
+        run: |
+          echo notebooks=$(find docs -name '*.ipynb' ! -name '*cloud*.ipynb' | jq -R -s -c 'split("\n")[:-1]') >> $GITHUB_OUTPUT
+
   notebooks-except-cloud:
     runs-on: ubuntu-latest
+    needs: get-notebooks
+    strategy:
+      max-parallel: 8
+      matrix:
+        notebook: ${{fromJson(needs.get-notebooks.outputs.notebooks)}}
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
@@ -78,13 +95,8 @@ jobs:
 
       - name: Run notebooks tests
         run: |
-          echo "All non-cloud notebooks:"
-
-          find docs -name '*.ipynb' ! -name '*cloud*.ipynb' | while read f
-          do
-              echo "Testing $f"
-              jupyter execute $f
-              if [ $? -ne 0 ]; then
-                  exit 1
-              fi
-          done
+          echo "Running ${{ matrix.notebook }}"
+          echo "Converting to .py"
+          jupytext --to py ${{ matrix.notebook }}
+          echo "Running ${{ matrix.notebook }}"
+          python ${{ matrix.notebook }} | sed 's/\.ipynb/\.py/'
