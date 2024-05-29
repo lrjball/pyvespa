@@ -98,5 +98,6 @@ jobs:
           echo "Running ${{ matrix.notebook }}"
           echo "Converting to .py"
           jupytext --to py ${{ matrix.notebook }}
-          echo "Running converted script"
-          python ${${{ matrix.notebook }}%.ipynb}.py
+          script_name=$(echo ${{ matrix.notebook }} | sed 's/\.ipynb$/\.py/')
+          echo "Script name is $script_name"
+          python $script_name
