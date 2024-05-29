@@ -1,79 +1,89 @@
 name: pyvespa - Tests - Except Cloud
 
 on:
-    workflow_dispatch:
-    push:
-        branches:
-            - thomasht86/tests-to-github-action
+  workflow_dispatch:
+  push:
+    branches:
+      - thomasht86/tests-to-github-action
 
 jobs:
-    unit-tests:
-     runs-on: ubuntu-latest
-     steps:
-       - uses: actions/checkout@v4
-       - name: Install pandoc
-         run: |
-            sudo apt-get update
-            sudo apt-get install -y pandoc
-       - name: Set up Python
-         uses: actions/setup-python@v5
-         with:
-            python-version: '3.9'
-            cache: 'pip' # caching pip dependencies
-       - name: Install dependencies
-         run: |
-           pip install -e .[dev]
-           pip install -r docs/sphinx/source/requirements.txt
-           pip install -r docs/sphinx/source/notebook_requirements.txt
-       - name: Run doc linkcheck
-         run: |
-           sphinx-build -E -D exclude_patterns=getting-started-pyvespa-cloud.ipynb -b linkcheck docs/sphinx/source docs/sphinx/build
-           sphinx-build -E -D exclude_patterns=getting-started-pyvespa-cloud.ipynb docs/sphinx/source docs/sphinx/build
-           rm -fr docs/sphinx/build
-       - name: Run doc tests
-         run: |
-           pytest vespa --doctest-modules
-       - name: Run unit tests
-         run: |
-           pytest tests/unit 
-    integration-except-cloud:
-      runs-on: ubuntu-latest
-      steps:
-        - uses: actions/checkout@v4
-        - name: Set up Python
-          uses: actions/setup-python@v5
-          with:
-            python-version: '3.9'
-            cache: 'pip' # caching pip dependencies
-        - name: Install dependencies
-          run: pip install -e .[dev]
-        - name: |
-            Run integration tests
-          run: |
-            pytest tests/integration/test_integration_docker.py -s -v
-    notebooks-except-cloud:
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v4
-            - name: Set up Python
-              uses: actions/setup-python@v5
-              with:
-                python-version: '3.9'
-                cache: 'pip' # caching pip dependencies
-            - name: Install dependencies
-              run: |
-                python -m pip install --upgrade pip
-                pip install -e .[dev]
-                pip install -r docs/sphinx/source/notebook_requirements.txt
-            - name: Run notebooks tests
-              run: |
-                echo "All non-cloud notebooks:"
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pandoc
+        run: |
+          wget https://github.com/jgm/pandoc/releases/download/3.2/pandoc-3.2-1-amd64.deb
+          sudo dpkg -i pandoc-3.2-1-amd64.deb
+          sudo apt-get install -f -y
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+          cache: "pip" # caching pip dependencies
+      - name: Set up uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          uv venv 
+          source .venv/bin/activate
 
-                find docs -name '*.ipynb' ! -name '*cloud*.ipynb' | while read f
-                do
-                    echo "Testing $f"
-                    jupyter execute $f
-                    if [ $? -ne 0 ]; then
-                        exit 1
-                    fi
-                done
+      - name: Install dependencies
+        run: |
+          uv pip install -e ".[dev]" -r docs/sphinx/source/requirements.txt -r docs/sphinx/source/notebook_requirements.txt
+      - name: Run doc linkcheck
+        run: |
+          sphinx-build -E -D exclude_patterns=getting-started-pyvespa-cloud.ipynb -b linkcheck docs/sphinx/source docs/sphinx/build
+          sphinx-build -E -D exclude_patterns=getting-started-pyvespa-cloud.ipynb docs/sphinx/source docs/sphinx/build
+          rm -fr docs/sphinx/build
+      - name: Run doc tests
+        run: |
+          pytest vespa --doctest-modules
+      - name: Run unit tests
+        run: |
+          pytest tests/unit
+  integration-except-cloud:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+          cache: "pip" # caching pip dependencies
+      - name: Install dependencies
+        run: pip install -e .[dev]
+      - name: |
+          Run integration tests
+        run: |
+          pytest tests/integration/test_integration_docker.py -s -v
+  notebooks-except-cloud:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+          cache: "pip" # caching pip dependencies
+      - name: Set up uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          uv venv 
+          source .venv/bin/activate
+
+      - name: Install dependencies
+        run: |
+          uv pip install -e ".[dev]" -r docs/sphinx/source/requirements.txt -r docs/sphinx/source/notebook_requirements.txt
+
+      - name: Run notebooks tests
+        run: |
+          echo "All non-cloud notebooks:"
+
+          find docs -name '*.ipynb' ! -name '*cloud*.ipynb' | while read f
+          do
+              echo "Testing $f"
+              jupyter execute $f
+              if [ $? -ne 0 ]; then
+                  exit 1
+              fi
+          done
