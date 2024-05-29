@@ -1,0 +1,68 @@
+name: pyvespa - Tests - Except Cloud
+
+on:
+    workflow_dispatch:
+    push:
+        branches:
+            - thomasht86/tests-to-github-action
+
+jobs:
+    unit-tests:
+     runs-on: ubuntu-latest
+     steps:
+       - uses: actions/checkout@v4
+       - name: Set up Python
+         uses: actions/setup-python@v5
+       - name: Install dependencies
+         run: |
+           python -m pip install --upgrade pip
+           pip install -e .[dev]
+           pip install -r docs/sphinx/source/requirements.txt
+           pip install -r docs/sphinx/source/notebook_requirements.txt
+       - name: Run doc linkcheck
+         run: |
+           sphinx-build -E -D exclude_patterns=getting-started-pyvespa-cloud.ipynb -b linkcheck docs/sphinx/source docs/sphinx/build
+           sphinx-build -E -D exclude_patterns=getting-started-pyvespa-cloud.ipynb docs/sphinx/source docs/sphinx/build
+           rm -fr docs/sphinx/build
+       - name: Run doc tests
+         run: |
+           pytest vespa --doctest-modules
+       - name: Run unit tests
+         run: |
+           pytest tests/unit 
+    integration-except-cloud:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+        - name: Set up Python
+          uses: actions/setup-python@v5
+        - name: Install dependencies
+          run: |
+            python -m pip install --upgrade pip
+            pip install -e .[dev]
+        - name: Run integration tests
+          run: |
+            pytest tests/integration/test_integration_docker.py -s -v
+    notebooks-except-cloud:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - name: Set up Python
+              uses: actions/setup-python@v5
+            - name: Install dependencies
+              run: |
+                python -m pip install --upgrade pip
+                pip install -e .[dev]
+                pip install -r docs/sphinx/source/notebook_requirements.txt
+            - name: Run notebooks tests
+              run: |
+                echo "All non-cloud notebooks:"
+
+                find docs -name '*.ipynb' ! -name '*cloud*.ipynb' | while read f
+                do
+                    echo "Testing $f"
+                    jupyter execute $f
+                    if [ $? -ne 0 ]; then
+                        exit 1
+                    fi
+                done
