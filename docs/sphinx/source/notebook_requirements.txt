@@ -11,3 +11,4 @@ pytrec_eval
 torch
 numpy
 vespacli
+lightgbm
