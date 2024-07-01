@@ -97,7 +97,7 @@ jobs:
         run: |
           echo "Running ${{ matrix.notebook }}"
           echo "Converting to .py"
-          jupytext --to py ${{ matrix.notebook }}
-          script_name=$(echo ${{ matrix.notebook }} | sed 's/\.ipynb$/\.py/')
-          echo "Script name is $script_name"
-          python $script_name
+          jupyter nbconvert --to notebook --execute ${{ matrix.notebook }}
+          # script_name=$(echo ${{ matrix.notebook }} | sed 's/\.ipynb$/\.py/')
+          # echo "Script name is $script_name"
+          # python $script_name
