@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyvespa"
-version = "0.40.0"
+version = "0.42.0"
 description = "Python API for vespa.ai"
 readme = "README.md"
 keywords = ["vespa", "search engine", "data science"]
@@ -18,7 +18,7 @@ dependencies = [
     "jinja2",
     "cryptography",
     "aiohttp",
-    "tenacity",
+    "tenacity>=8.4.1",
     "typing_extensions",
 ]
 
@@ -49,6 +49,7 @@ dev = [
     "ruff",
     "pre-commit",
     "jupytext",
+    "vespacli",
 ]
 build = [
     "setuptools==69.0.3",
@@ -58,9 +59,10 @@ build = [
     "requests~=2.26.0",
     "ruff",
 ]
+vespacli = ["vespacli"]
 
 [tool.setuptools]
-packages = ["vespa"]
+package-dir = {vespa = "vespa"}
 
 [tool.ruff]
 exclude = [
