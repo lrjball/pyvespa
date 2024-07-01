@@ -1,4 +1,4 @@
-name: pyvespa - Tests - Except Cloud
+name: pyvespa - Tests - Except Cloud - Github Action
 
 on:
   workflow_dispatch:
