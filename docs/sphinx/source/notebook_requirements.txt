@@ -1,6 +1,7 @@
 plotly
 pandas
 datasets
+cohere==4.57
 pytest
 notebook
 nbconvert<=7.12.0
