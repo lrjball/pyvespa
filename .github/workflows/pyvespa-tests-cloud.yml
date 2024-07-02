@@ -114,6 +114,8 @@ jobs:
       - name: Run notebooks tests
         env:
           VESPA_TEAM_API_KEY: ${{ secrets.VESPA_TEAM_API_KEY }}
+          CO_API_KEY: ${{ secrets.CO_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           echo "Running ${{ matrix.notebook }}"
           echo "Converting to .py"
