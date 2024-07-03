@@ -15,8 +15,14 @@ def deploy_prod(
         key_content=api_key,
         application_root=application_root,
     )
-    build_no = vespa_cloud.deploy_to_prod(application_root, source_url=source_url)
-    vespa_cloud.wait_for_prod_deployment(build_no, max_wait=max_wait)
+    build_no = vespa_cloud.deploy_to_prod(
+        instance="default", application_root=application_root, source_url=source_url
+    )
+    success = vespa_cloud.wait_for_prod_deployment(build_no, max_wait=max_wait)
+    if not success:
+        raise ValueError(
+            f"Deployment failed to complete within {max_wait} seconds. Please check the Vespa Cloud console for more information."
+        )
 
 
 if __name__ == "__main__":
