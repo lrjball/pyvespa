@@ -2,9 +2,9 @@ name: pyvespa - Tests - Cloud - Github Action
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - thomasht86/tests-to-github-action
+  # push:
+  #   branches:
+  #     - thomasht86/tests-to-github-action
 
 jobs:
   integration-vespa-cloud:
