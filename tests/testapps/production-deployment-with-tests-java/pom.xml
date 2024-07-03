@@ -8,10 +8,7 @@
     <groupId>ai.vespa.example</groupId>
     <artifactId>tests</artifactId>
     <version>1.0.0</version>
-    <packaging>pom</packaging>
-    <modules>
-        <module>demo</module>
-    </modules>
+    <packaging>container-plugin</packaging>
 
     <parent>
         <groupId>com.yahoo.vespa</groupId>
