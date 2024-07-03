@@ -21,8 +21,10 @@ jobs:
           java-version: "17"
       # Find Vespa version of current production deployment
       - name: Find compile version
+        env:
+          VESPA_TEAM_API_KEY: ${{ secrets.VESPA_TEAM_API_KEY }}
         working-directory: tests/testapps/production-deployment-with-tests-java
-        run: mvn -B clean vespa:compileVersion -DapiKey="${VESPA_TEAM_VESPACLOUD_DOCSEARCH_API_KEY}"
+        run: mvn -B clean vespa:compileVersion -DapiKey="${VESPA_TEAM_API_KEY}"
 
       # Build the application package and the tester bundle
       - name: Build with Maven
