@@ -31,12 +31,12 @@ jobs:
         working-directory: tests/testapps/production-deployment-with-tests-java
         run: mvn -B package -Dvespa.compile.version="$(cat target/vespa.compile.version)"
 
-      # Upload artifacts to be used in the deploy job
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          path: target/*
-          name: applicationpackage
+      #   # Upload artifacts to be used in the deploy job
+      #   - name: Upload artifacts
+      #     uses: actions/upload-artifact@v4
+      #     with:
+      #       path: target/*
+      #       name: applicationpackage
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -44,7 +44,7 @@ jobs:
           python-version: "3.11"
           cache: "pip" # caching pip dependencies
       - name: Install dependencies
-        run: pip install pyvespa vespacli
+        run: pip install pyvespa vespacli python-dateutil
 
       - name: Deploy to prod
         env:
