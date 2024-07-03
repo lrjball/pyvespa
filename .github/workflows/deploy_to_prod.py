@@ -12,7 +12,7 @@ def deploy_prod(
     vespa_cloud = VespaCloud(
         tenant=tenant,
         application=application,
-        key_content=api_key.replace(r"\n", "\n"),
+        key_content=api_key,
         application_root=application_root,
     )
     build_no = vespa_cloud.deploy_to_prod(application_root, source_url=source_url)

@@ -49,11 +49,13 @@ jobs:
       - name: Deploy to prod
         env:
           VESPA_TEAM_API_KEY: ${{ secrets.VESPA_TEAM_API_KEY }}
+        working-directory: tests/testapps/production-deployment-with-tests-java
         run: |
-          python .github/workflows/deploy_to_prod.py \
+          # Run script from project root
+          python $GITHUB_WORKSPACE/.github/workflows/deploy_to_prod.py \
           --tenant vespa-team  \
           --application testapp \
-          --api-key "${VESPA_TEAM_API_KEY}" \
-          --application-root tests/testapps/production-deployment-with-tests-java/target/ \
+          --api-key ${VESPA_TEAM_API_KEY} \
+          --application-root . \
           --max-wait 3600 \
           --source-url "$(git config --get remote.origin.url | sed 's+git@\(.*\):\(.*\)\.git+https://\1/\2+')/commit/$(git rev-parse HEAD)"
