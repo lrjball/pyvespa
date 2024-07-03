@@ -22,7 +22,9 @@ if __name__ == "__main__":
     args = argparse.ArgumentParser()
     args.add_argument("--tenant", required=True, help="Vespa Cloud tenant")
     args.add_argument("--application", required=True, help="Vespa Cloud application")
-    args.add_argument("--api-key", required=True, help="Vespa Cloud API key")
+    args.add_argument(
+        "--api-key", required=True, help="Vespa Cloud Control-plane API key"
+    )
     args.add_argument(
         "--application-root", required=True, help="Path to the Vespa application root"
     )
