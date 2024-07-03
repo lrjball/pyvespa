@@ -4,19 +4,15 @@
 import argparse
 
 from vespa.deployment import VespaCloud
-import os
 
 
 def deploy_prod(
     tenant, application, api_key, application_root, max_wait=3600, source_url=None
 ):
-    key = os.getenv("VESPA_TEAM_API_KEY").replace(r"\n", "\n")
-    print("Key == api_key")
-    print(key == api_key)
     vespa_cloud = VespaCloud(
         tenant=tenant,
         application=application,
-        key_content=api_key,
+        key_content=api_key.replace(r"\n", "\n"),
         application_root=application_root,
     )
     build_no = vespa_cloud.deploy_to_prod(application_root, source_url=source_url)
