@@ -36,6 +36,7 @@ from vespa.io import VespaQueryResponse, VespaResponse, VespaVisitResponse
 from vespa.package import ApplicationPackage
 import httpx
 import vespa
+import gzip
 
 VESPA_CLOUD_SECRET_TOKEN: str = "VESPA_CLOUD_SECRET_TOKEN"
 
@@ -126,6 +127,7 @@ class Vespa(object):
             if token is not None:
                 self.vespa_cloud_secret_token = token
         self.auth_method = None
+        self.auth_method = self._get_valid_auth_method()
 
     def asyncio(
         self, connections: Optional[int] = 8, total_timeout: int = 10
@@ -149,7 +151,9 @@ class Vespa(object):
             app=self, connections=connections, total_timeout=total_timeout
         )
 
-    def syncio(self, connections: Optional[int] = 8) -> "VespaSync":
+    def syncio(
+        self, connections: Optional[int] = 8, compress: bool = False
+    ) -> "VespaSync":
         """
         Access Vespa synchronous connection layer.
         Should be used as a context manager.
@@ -166,7 +170,10 @@ class Vespa(object):
         :return: Instance of Vespa asynchronous layer.
         """
         return VespaSync(
-            app=self, pool_connections=connections, pool_maxsize=connections
+            app=self,
+            pool_connections=connections,
+            pool_maxsize=connections,
+            compress=compress,
         )
 
     @staticmethod
@@ -258,7 +265,7 @@ class Vespa(object):
         """
         endpoint = f"{self.end_point}/ApplicationStatus"
 
-        if self.auth_method:
+        if self.auth_method is not None:
             return self.auth_method
 
         # Plain HTTP
@@ -983,7 +990,13 @@ class Vespa(object):
 
 class CustomHTTPAdapter(HTTPAdapter):
     def __init__(
-        self, pool_connections=10, pool_maxsize=10, num_retries_429=10, *args, **kwargs
+        self,
+        pool_connections=10,
+        pool_maxsize=10,
+        num_retries_429=10,
+        compress=False,
+        *args,
+        **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.num_retries_429 = num_retries_429
@@ -995,8 +1008,31 @@ class CustomHTTPAdapter(HTTPAdapter):
             status_forcelist=[429, 503],
             allowed_methods=["POST", "GET", "DELETE", "PUT"],
         )
+        self.compress: bool = compress
+
+    def add_headers(self, request, **kwargs):
+        if not self.compress:
+            # Tell the server that we support compression
+            super(CustomHTTPAdapter, self).add_headers(request, **kwargs)
+            return
+        body = request.body
+        if isinstance(body, bytes):
+            content_length = len(body)
+        else:
+            content_length = body.seek(0, 2)
+            body.seek(0, 0)
+
+        headers = {
+            "Content-Encoding": "gzip",
+            "Accept-Encoding": "gzip",
+            "Content-length": content_length,
+        }
+        request.headers.update(headers)
 
     def send(self, request, **kwargs) -> Response:
+        if self.compress:
+            print("Compressing request body", file=sys.stderr)
+            request.body = gzip.compress(request.body)
         for attempt in range(self.num_retries_429 + 1):
             try:
                 response = super().send(request, **kwargs)
@@ -1024,7 +1060,11 @@ class CustomHTTPAdapter(HTTPAdapter):
 
 class VespaSync(object):
     def __init__(
-        self, app: Vespa, pool_maxsize: int = 10, pool_connections: int = 10
+        self,
+        app: Vespa,
+        pool_maxsize: int = 10,
+        pool_connections: int = 10,
+        compress: bool = False,
     ) -> None:
         """
         Class to handle synchronous requests to Vespa.
@@ -1054,7 +1094,7 @@ class VespaSync(object):
             self.cert = (self.app.cert, self.app.key)
         else:
             self.cert = self.app.cert
-        self.app.auth_method = self.app._get_valid_auth_method()
+        # self.app.auth_method = self.app._get_valid_auth_method()
         self.headers = self.app.base_headers.copy()
         if self.app.auth_method == "token" and self.app.vespa_cloud_secret_token:
             # Bearer and user-agent
@@ -1069,6 +1109,7 @@ class VespaSync(object):
             max_retries=10,
             num_retries_429=10,
             pool_block=True,
+            compress=compress,
         )
 
     def __enter__(self):
