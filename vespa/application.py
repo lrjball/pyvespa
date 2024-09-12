@@ -967,25 +967,26 @@ class CustomHTTPAdapter(HTTPAdapter):
         return content_length
 
     def add_headers(self, request, **kwargs):
-        content_length = self.check_size(request)
-        if self.compress == "auto":
-            if content_length > self.compress_larger_than:
-                self.compress = True
-            else:
-                self.compress = False
-        if not self.compress:
-            # Tell the server that we support compression
-            super(CustomHTTPAdapter, self).add_headers(request, **kwargs)
-            return
-        headers = {
-            "Content-Encoding": "gzip",
-            "Accept-Encoding": "gzip",
-            "Content-length": content_length,
-        }
-        request.headers.update(headers)
+        if request.method in ["POST", "PUT"] and request.body is not None:
+            content_length = self.check_size(request)
+            if self.compress == "auto":
+                if content_length > self.compress_larger_than:
+                    self.compress = True
+                else:
+                    self.compress = False
+            if not self.compress:
+                # Tell the server that we support compression
+                super(CustomHTTPAdapter, self).add_headers(request, **kwargs)
+                return
+            headers = {
+                "Content-Encoding": "gzip",
+                "Accept-Encoding": "gzip",
+                "Content-length": content_length,
+            }
+            request.headers.update(headers)
 
     def send(self, request, **kwargs) -> Response:
-        if self.compress:
+        if self.compress and request.method in ["POST", "PUT"]:
             print("Compressing request body", file=sys.stderr)
             request.body = gzip.compress(request.body)
         for attempt in range(self.num_retries_429 + 1):
