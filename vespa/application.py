@@ -151,7 +151,7 @@ class Vespa(object):
         )
 
     def syncio(
-        self, connections: Optional[int] = 8, compress: bool = False
+        self, connections: Optional[int] = 8, compress: Union[bool, str] = "auto"
     ) -> "VespaSync":
         """
         Access Vespa synchronous connection layer.
@@ -934,13 +934,15 @@ class Vespa(object):
 class CustomHTTPAdapter(HTTPAdapter):
     def __init__(
         self,
-        pool_connections=10,
-        pool_maxsize=10,
-        num_retries_429=10,
-        compress=False,
+        pool_connections: int = 10,
+        pool_maxsize: int = 10,
+        num_retries_429: int = 10,
+        compress: Union[bool, str] = "auto",
         *args,
         **kwargs,
     ):
+        if compress not in [True, False, "auto"]:
+            raise ValueError("compress should be True, False or 'auto'")
         super().__init__(*args, **kwargs)
         self.num_retries_429 = num_retries_429
 
@@ -951,20 +953,30 @@ class CustomHTTPAdapter(HTTPAdapter):
             status_forcelist=[429, 503],
             allowed_methods=["POST", "GET", "DELETE", "PUT"],
         )
-        self.compress: bool = compress
+        self.compress = compress
+        self.compress_larger_than = (
+            1024  # Will compress if content length is larger than 1024 bytes
+        )
+
+    def check_size(self, request):
+        if isinstance(request.body, bytes):
+            content_length = len(request.body)
+        else:
+            content_length = request.body.seek(0, 2)
+            request.body.seek(0, 0)
+        return content_length
 
     def add_headers(self, request, **kwargs):
+        content_length = self.check_size(request)
+        if self.compress == "auto":
+            if content_length > self.compress_larger_than:
+                self.compress = True
+            else:
+                self.compress = False
         if not self.compress:
             # Tell the server that we support compression
             super(CustomHTTPAdapter, self).add_headers(request, **kwargs)
             return
-        body = request.body
-        if isinstance(body, bytes):
-            content_length = len(body)
-        else:
-            content_length = body.seek(0, 2)
-            body.seek(0, 0)
-
         headers = {
             "Content-Encoding": "gzip",
             "Accept-Encoding": "gzip",
@@ -1007,7 +1019,7 @@ class VespaSync(object):
         app: Vespa,
         pool_maxsize: int = 10,
         pool_connections: int = 10,
-        compress: bool = False,
+        compress: Union[bool, str] = "auto",
     ) -> None:
         """
         Class to handle synchronous requests to Vespa.
@@ -1031,6 +1043,7 @@ class VespaSync(object):
             app (Vespa): Vespa app object.
             pool_maxsize (int, optional): The maximum number of connections to save in the pool. Defaults to 10.
             pool_connections (int, optional): The number of urllib3 connection pools to cache. Defaults to 10.
+            compress (Union[bool, str], optional): If True, will compress the request body. If "auto", will compress if the content length is larger than 1024 bytes. Defaults to "auto".
         """
         self.app = app
         if self.app.key:
