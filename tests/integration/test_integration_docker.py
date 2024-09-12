@@ -29,6 +29,8 @@ from vespa.deployment import VespaDocker
 from vespa.application import VespaSync
 from vespa.exceptions import VespaError
 import random
+import requests_mock
+import gzip
 
 CONTAINER_STOP_TIMEOUT = 10
 RESOURCES_DIR = get_resource_path()
@@ -940,6 +942,42 @@ class TestApplicationCommon(unittest.TestCase):
         ):
             _ = app.predict("this is a test", model_id="bert_tiny")
 
+    def check_sync_compression_post(self, app, body, compression_arg):
+        # Step 1: Prepare the endpoint and the request body
+        url = app.search_end_point
+        with requests_mock.Mocker() as m:
+            # Step 2: Mock the POST request and intercept it
+            m.post(url, text="success", request_headers={"Content-Encoding": "gzip"})
+
+            # Step 3: Use the app's sync context with the compression argument
+            with app.syncio(compress=compression_arg) as sync_app:
+                # Step 4: Perform the POST request
+                response = sync_app.query(body=body)
+
+                # Step 5: Verify the response status
+                self.assertEqual(response.status_code, 200)
+
+                # Step 6: Get the last request that was made
+                last_request = m.last_request
+
+                # Step 7: Check if the request was compressed when compression is expected
+                if (
+                    compression_arg == "auto"
+                    and len(body) > sync_app.adapter.compress_larger_than
+                    or compression_arg is True
+                ):
+                    self.assertEqual(
+                        last_request.headers.get("Content-Encoding"), "gzip"
+                    )
+
+                    # Step 8: Check if the body is compressed
+                    compressed_body = last_request.body
+                    uncompressed_body = gzip.decompress(compressed_body)
+                    self.assertEqual(uncompressed_body.decode("utf-8"), body)
+                else:
+                    # Step 9: Verify that compression was not applied
+                    self.assertNotIn("Content-Encoding", last_request.headers)
+
 
 class TestMsmarcoDockerDeployment(TestDockerCommon):
     def setUp(self) -> None:
@@ -1055,6 +1093,42 @@ class TestMsmarcoApplication(TestApplicationCommon):
                 expected_fields_from_get_operation=self.fields_to_send,
             )
         )
+
+    # def test_compression_auto_small(self):
+    #     self.check_sync_compression_post(
+    #         app=self.app,
+    #         body="this is a test",
+    #         compression_arg="auto",
+    #     )
+
+    # def test_compression_auto_large(self):
+    #     self.check_sync_compression_post(
+    #         app=self.app,
+    #         body="this is a test" * 1000,
+    #         compression_arg="auto",
+    #     )
+
+    # def test_compression_true(self):
+    #     self.check_sync_compression_post(
+    #         app=self.app,
+    #         body="this is a test",
+    #         compression_arg=True,
+    #     )
+
+    # def test_compression_false(self):
+    #     self.check_sync_compression_post(
+    #         app=self.app,
+    #         body="this is a test",
+    #         compression_arg=False,
+    #     )
+
+    # def test_compression_invalid(self):
+    #     with self.assertRaises(ValueError):
+    #         self.check_sync_compression_post(
+    #             app=self.app,
+    #             body="this is a test",
+    #             compression_arg="invalid",
+    #         )
 
     def tearDown(self) -> None:
         self.app.delete_all_docs(
