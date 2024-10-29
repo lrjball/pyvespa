@@ -156,6 +156,15 @@ services_tags = [
     "client",
     "certificate",
     "token",
+    "logserver",
+    "monitoring",
+    "metrics",
+    "consumer",
+    "metric-set",
+    "metric",
+    "cloudwatch",
+    "shared-credentials",
+    "logging",
 ]
 
 # Fail if any tag is duplicated. Provide feedback of which tags are duplicated.
