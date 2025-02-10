@@ -2,7 +2,7 @@
 # See LICENSE in the project root.
 
 import unittest
-
+import time
 from typing import Dict, Any
 
 from datasets import load_dataset
@@ -212,6 +212,80 @@ class TestSemanticIntegration(unittest.TestCase):
             with self.subTest(metric=metric):
                 # Tolerance of 0.01
                 self.assertAlmostEqual(vespa_val, st_value, delta=0.0001)
+
+
+class TestEvaluationPerformance(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # 1) Build and deploy the application package
+        cls.package = create_app_package()
+        cls.vespa_docker = VespaDocker(port=8089)
+
+        cls.app = cls.vespa_docker.deploy(application_package=cls.package)
+        n_docs = 1000
+        num_queries = 1000
+        # 2) Load a portion of the MSMARCO corpus
+        dataset_id = "BeIR/msmarco"
+        dataset = load_dataset(dataset_id, "corpus", streaming=True)
+        # Convert to feed format
+        vespa_feed = (
+            dataset["corpus"]
+            .take(n_docs)
+            .map(
+                lambda x: {
+                    "id": x["_id"],
+                    "fields": {"text": x["text"], "id": x["_id"]},
+                }
+            )
+        )
+
+        # 3) Feed the documents
+        def feed_callback(response: VespaResponse, doc_id: str):
+            if not response.is_successful():
+                print(f"Error feeding doc {doc_id}: {response.json}")
+
+        cls.app.feed_async_iterable(vespa_feed, schema="doc", callback=feed_callback)
+
+        # Prepare queries and qrels
+        query_ds_full = load_dataset(dataset_id, "queries", streaming=True)
+        query_ds = list(query_ds_full["queries"].take(num_queries))
+        cls.ids_to_query = {q["_id"]: q["text"] for q in query_ds}
+
+        # Load qrels - need all to make sure all queries have at least one relevant doc
+        qrel_dataset_id = "BeIR/msmarco-qrels"
+        qrels = load_dataset(qrel_dataset_id, split="train")
+        rel_q_ids = list(map(str, qrels["query-id"]))
+        rel_doc_ids = list(map(str, qrels["corpus-id"]))
+        cls.relevant_docs = dict(zip(rel_q_ids, rel_doc_ids))
+
+    @classmethod
+    def tearDownClass(cls):
+        # Clean up container
+        cls.vespa_docker.container.stop(timeout=10)
+        cls.vespa_docker.container.remove()
+
+    def test_evaluation_speed(self):
+        """
+        Use VespaEvaluator on the 'semantic' ranking profile with the
+        queries & relevant docs from the NanoMSMARCO subset,
+        then compare the results to the reference values from ST.
+        """
+
+        evaluator = VespaEvaluator(
+            queries=self.ids_to_query,
+            relevant_docs=self.relevant_docs,
+            vespa_query_fn=semantic_query_fn,
+            app=self.app,
+            name="perf",
+        )
+
+        # Evaluate
+        start_time = time.perf_counter()
+        results = evaluator.run()
+        print("Got results: ", results)
+        elapsed_time = time.perf_counter() - start_time
+        print(f"Got results in {elapsed_time:.2f} seconds")
+        self.assertLess(elapsed_time, 10.0)
 
 
 if __name__ == "__main__":
