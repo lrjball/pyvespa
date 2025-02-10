@@ -4,7 +4,8 @@ import csv
 import logging
 from typing import Dict, Set, Callable, List, Optional, Union
 import math
-import asyncio
+import time
+from collections import Counter
 from vespa.application import Vespa
 from vespa.io import VespaQueryResponse
 
@@ -110,8 +111,11 @@ class VespaEvaluator:
 
     def __init__(
         self,
-        queries: Dict[str, str],
-        relevant_docs: Union[Dict[str, Set[str]], Dict[str, str]],
+        queries: Dict[Union[str, int], str],
+        relevant_docs: Union[
+            Dict[Union[str, int], Set[Union[str, int]]],
+            Dict[Union[str, int], Union[str, int]],
+        ],
         vespa_query_fn: Callable[[str, int], dict],
         app: Vespa,
         name: str = "",
@@ -150,6 +154,12 @@ class VespaEvaluator:
                 self.queries_ids.append(qid)
 
         self.queries = [queries[qid] for qid in self.queries_ids]
+        if not self.queries:
+            raise ValueError("No queries with relevant docs.")
+        else:
+            logger.info(
+                f"Filtered out queries without relevant docs. {len(self.queries)} queries remaining."
+            )
         self.relevant_docs = relevant_docs
 
         self.accuracy_at_k = accuracy_at_k
@@ -180,31 +190,44 @@ class VespaEvaluator:
             "map@{}",
         ]
 
-    def _validate_queries(self, queries: Dict[str, str]):
+    def _validate_queries(self, queries: Dict[Union[str, int], str]):
         if not isinstance(queries, dict):
             raise ValueError("queries must be a dict of query_id => query_text")
         for qid, query_text in queries.items():
-            if not isinstance(qid, str) or not isinstance(query_text, str):
-                raise ValueError("Each query must be a string.", qid, query_text)
+            if not isinstance(qid, (str, int)) or not isinstance(query_text, str):
+                raise ValueError(
+                    "Each query id must be a string or int, and each query must be a string.",
+                    qid,
+                    query_text,
+                )
 
     def _validate_qrels(
-        self, qrels: Union[Dict[str, Set[str]], Dict[str, str]]
-    ) -> Dict[str, Set[str]]:
+        self,
+        qrels: Union[
+            Dict[Union[str, int], Set[Union[str, int]]],
+            Dict[Union[str, int], Union[str, int]],
+        ],
+    ) -> Dict[Union[str, int], Set[Union[str, int]]]:
         if not isinstance(qrels, dict):
             raise ValueError(
                 "qrels must be a dict of query_id => set of relevant doc_ids"
             )
-        new_qrels: Dict[str, Set[str]] = {}
+        new_qrels: Dict[Union[str, int], Set[Union[str, int]]] = {}
         for qid, relevant_docs in qrels.items():
-            if not isinstance(qid, str):
+            if not isinstance(qid, (str, int)):
                 raise ValueError(
-                    "Each qrel must be a string query_id and a set of doc_ids.",
+                    "Each qrel must be a string or int query_id and a set of doc_ids.",
                     qid,
                     relevant_docs,
                 )
-            if isinstance(relevant_docs, str):
+            if isinstance(relevant_docs, (str, int)):
                 new_qrels[qid] = {relevant_docs}
             elif isinstance(relevant_docs, set):
+                for doc_id in relevant_docs:
+                    if not isinstance(doc_id, (str, int)):
+                        raise ValueError(
+                            "Each doc_id in the set must be a string or int."
+                        )
                 new_qrels[qid] = relevant_docs
             else:
                 raise ValueError(
@@ -281,6 +304,7 @@ class VespaEvaluator:
                 ...
             }
         """
+        start_time = time.perf_counter()
         max_k = max(
             max(self.accuracy_at_k) if self.accuracy_at_k else 0,
             max(self.precision_recall_at_k) if self.precision_recall_at_k else 0,
@@ -295,7 +319,7 @@ class VespaEvaluator:
         # Build query bodies using the provided vespa_query_fn
         query_bodies = []
 
-        # Check timing info with first query only
+        # Check timing info with first query only. Get first dict value
         first_query = self.queries[0]
         first_body = self.vespa_query_fn(first_query, max_k)
         if "presentation.timing" not in first_body:
@@ -313,14 +337,11 @@ class VespaEvaluator:
             logger.debug(f"Querying Vespa with: {query_body}")
 
         # Execute queries in parallel using query_many from the Vespa class
-        responses: List[VespaQueryResponse] = asyncio.run(
-            self.app.query_many(query_bodies)
-        )
-        for resp in responses:
-            if resp.status_code != 200:
-                raise ValueError(
-                    f"Vespa query failed with status code {resp.status_code}, response: {resp.get_json()}"
-                )
+        responses: List[VespaQueryResponse] = self.app.query_many(query_bodies)
+        # Create a Counter with status codes
+        status_codes = Counter([resp.status_code for resp in responses])
+        if status_codes.get(200, 0) != len(responses):
+            logger.warning(f"Received non-200 status codes: {status_codes}")
         queries_result_list = []
         for resp in responses:
             # Extract search timing information
@@ -357,7 +378,12 @@ class VespaEvaluator:
 
         if self.write_csv:
             self._write_csv(metrics, searchtime_stats)
-
+        # Log info about number of queries evaluated
+        end_time = time.perf_counter()
+        elapsed_time = end_time - start_time
+        logger.info(
+            f"Finished evaluating {len(self.queries_ids)} queries in {elapsed_time:.2f} seconds."
+        )
         return metrics
 
     def _calculate_searchtime_stats(self) -> Dict[str, float]:
